@@ -38,11 +38,20 @@ def make_callback(f):
 
 
 def retry_deferred(*retry_args, **retry_kwargs):
+    """
+    Wrap a test method that may or may not return a Deferred
+    result and ensure the underlying behavior honors the retry
+    parameters. Honors the same parameters as
+    ``jaraco.functools.retry``.
+    """
     def decorator(f):
         @functools.wraps(f)
         def wrapper(*args, **kwargs):
             retried = retry(*retry_args, **retry_kwargs)(f)
+            # invoke the function using retries
             result = retried(*args, **kwargs)
+            # if the result is a Deferred, wrap the inner
+            # callback(s) in retries
             if isinstance(result, Deferred):
                 result.callbacks[:] = [
                     (
@@ -63,6 +72,10 @@ def retry_deferred(*retry_args, **retry_kwargs):
 
 
 def test_deferred(f):
+    """
+    Wrap a synchronous test method to instead return a Deferred
+    that is triggered after 100ms.
+    """
     @functools.wraps(f)
     def wrapper(*args, **kwargs):
         result = Deferred()
