@@ -44,10 +44,19 @@ def retry_deferred(*retry_args, **retry_kwargs):
             retried = retry(*retry_args, **retry_kwargs)(f)
             result = retried(*args, **kwargs)
             if isinstance(result, Deferred):
-                new = Deferred()
-                cb_retried = retry(*retry_args, **retry_kwargs)(result.callback)
-                new.addCallback(cb_retried, *args, **kwargs)
-                return new
+                result.callbacks[:] = [
+                    (
+                        (
+                            retry(*retry_args, **retry_kwargs)(callback),
+                            callbackArgs,
+                            callbackKeywords,
+                        ),
+                        errback_spec,
+                    )
+                    for (
+                        callback, callbackArgs, callbackKeywords),
+                    errback_spec in result.callbacks
+                ]
             return result
         return wrapper
     return decorator
@@ -64,12 +73,12 @@ def test_deferred(f):
 
 
 class DeferredsTests(unittest.TestCase):
-    @retry_deferred()
+    @retry_deferred(retries=11, trap=Exception)
     @test_deferred
     def test_simple_exception(self):
         flaky_exception()
 
-    @retry_deferred()
+    @retry_deferred(retries=11, trap=Exception)
     @test_deferred
     def test_simple_failure(self):
         flaky_fail(self)
