@@ -1,5 +1,6 @@
 import random
 import functools
+from jaraco.functools import retry
 
 from twisted.internet.defer import Deferred
 from twisted.internet import reactor
@@ -18,12 +19,15 @@ def flaky_fail(test):
 
 
 class ThingsTest(unittest.TestCase):
+    @retry(retries=11, trap=Exception)
     def test_simple_exception(self):
         flaky_exception()
 
+    @retry(retries=11, trap=Exception)
     def test_simple_failure(self):
         flaky_fail(self)
 
+    @retry(retries=11, trap=Exception)
     def test_simple_assertion(self):
         if random.random() < flaky_rate:
             assert False, "flaky assertion"
