@@ -1,4 +1,5 @@
 import random
+import functools
 
 from twisted.internet.defer import Deferred
 from twisted.internet import reactor
@@ -32,15 +33,21 @@ def make_callback(f):
     return lambda result, *args, **kwargs: f(*args, **kwargs)
 
 
-class DeferredsTests(unittest.TestCase):
-    def test_simple_exception(self):
+def test_deferred(f):
+    @functools.wraps(f)
+    def wrapper(*args, **kwargs):
         result = Deferred()
         reactor.callLater(.1, result.callback, None)
-        result.addCallback(make_callback(flaky_exception))
+        result.addCallback(make_callback(f), *args, **kwargs)
         return result
+    return wrapper
 
+
+class DeferredsTests(unittest.TestCase):
+    @test_deferred
+    def test_simple_exception(self):
+        flaky_exception()
+
+    @test_deferred
     def test_simple_failure(self):
-        result = Deferred()
-        reactor.callLater(.1, result.callback, None)
-        result.addCallback(make_callback(flaky_fail), test=self)
-        return result
+        flaky_fail(self)
