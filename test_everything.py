@@ -37,6 +37,22 @@ def make_callback(f):
     return lambda result, *args, **kwargs: f(*args, **kwargs)
 
 
+def retry_deferred(*retry_args, **retry_kwargs):
+    def decorator(f):
+        @functools.wraps(f)
+        def wrapper(*args, **kwargs):
+            retried = retry(*retry_args, **retry_kwargs)(f)
+            result = retried(*args, **kwargs)
+            if isinstance(result, Deferred):
+                new = Deferred()
+                cb_retried = retry(*retry_args, **retry_kwargs)(result.callback)
+                new.addCallback(cb_retried, *args, **kwargs)
+                return new
+            return result
+        return wrapper
+    return decorator
+
+
 def test_deferred(f):
     @functools.wraps(f)
     def wrapper(*args, **kwargs):
@@ -48,10 +64,12 @@ def test_deferred(f):
 
 
 class DeferredsTests(unittest.TestCase):
+    @retry_deferred()
     @test_deferred
     def test_simple_exception(self):
         flaky_exception()
 
+    @retry_deferred()
     @test_deferred
     def test_simple_failure(self):
         flaky_fail(self)
