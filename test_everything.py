@@ -4,7 +4,7 @@ from twisted.internet.defer import Deferred
 from twisted.internet import reactor
 from twisted.trial import unittest
 
-flaky_rate = 0
+flaky_rate = .3
 
 
 def flaky_exception():
@@ -28,15 +28,19 @@ class ThingsTest(unittest.TestCase):
             assert False, "flaky assertion"
 
 
+def make_callback(f):
+    return lambda result, *args, **kwargs: f(*args, **kwargs)
+
+
 class DeferredsTests(unittest.TestCase):
     def test_simple_exception(self):
         result = Deferred()
-        reactor.callLater(.1, result.callback)
-        result.addCallback(flaky_exception)
+        reactor.callLater(.1, result.callback, None)
+        result.addCallback(make_callback(flaky_exception))
         return result
 
-    def _test_simple_failure(self):
+    def test_simple_failure(self):
         result = Deferred()
-        reactor.callLater(.1, result.callback)
-        result.addCallback(flaky_fail, self)
+        reactor.callLater(.1, result.callback, None)
+        result.addCallback(make_callback(flaky_fail), test=self)
         return result
