@@ -1,6 +1,6 @@
 import random
 import functools
-from jaraco.functools import retry
+from tenacity import retry, stop_after_attempt
 
 from twisted.internet.defer import Deferred
 from twisted.internet import reactor
@@ -19,15 +19,15 @@ def flaky_fail(test):
 
 
 class ThingsTest(unittest.TestCase):
-    @retry(retries=11, trap=Exception)
+    @retry(reraise=True, stop=stop_after_attempt(12))
     def test_simple_exception(self):
         flaky_exception()
 
-    @retry(retries=11, trap=Exception)
+    @retry(reraise=True, stop=stop_after_attempt(12))
     def test_simple_failure(self):
         flaky_fail(self)
 
-    @retry(retries=11, trap=Exception)
+    @retry(reraise=True, stop=stop_after_attempt(12))
     def test_simple_assertion(self):
         if random.random() < flaky_rate:
             assert False, "flaky assertion"
@@ -41,8 +41,7 @@ def retry_deferred(*retry_args, **retry_kwargs):
     """
     Wrap a test method that may or may not return a Deferred
     result and ensure the underlying behavior honors the retry
-    parameters. Honors the same parameters as
-    ``jaraco.functools.retry``.
+    parameters. Honors the same parameters as ``retry``.
     """
     def decorator(f):
         @functools.wraps(f)
@@ -86,12 +85,12 @@ def test_deferred(f):
 
 
 class DeferredsTests(unittest.TestCase):
-    @retry_deferred(retries=11, trap=Exception)
+    @retry_deferred(reraise=True, stop=stop_after_attempt(12))
     @test_deferred
     def test_simple_exception(self):
         flaky_exception()
 
-    @retry_deferred(retries=11, trap=Exception)
+    @retry_deferred(reraise=True, stop=stop_after_attempt(12))
     @test_deferred
     def test_simple_failure(self):
         flaky_fail(self)
