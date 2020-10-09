@@ -70,7 +70,7 @@ def retry_deferred(*retry_args, **retry_kwargs):
     return decorator
 
 
-def test_deferred(f):
+def setup_deferred(f):
     """
     Wrap a synchronous test method to instead return a Deferred
     that is triggered after 100ms.
@@ -84,13 +84,26 @@ def test_deferred(f):
     return wrapper
 
 
+def make_flaky(f):
+    """
+    Wrap a function to make it flaky before called.
+    """
+    @functools.wraps(f)
+    def wrapper(*args, **kwargs):
+        flaky_exception()
+        return f(*args, **kwargs)
+    return wrapper
+
+
 class DeferredsTests(unittest.TestCase):
     @retry_deferred(reraise=True, stop=stop_after_attempt(12))
-    @test_deferred
+    @make_flaky
+    @setup_deferred
     def test_simple_exception(self):
         flaky_exception()
 
     @retry_deferred(reraise=True, stop=stop_after_attempt(12))
-    @test_deferred
+    @make_flaky
+    @setup_deferred
     def test_simple_failure(self):
         flaky_fail(self)
