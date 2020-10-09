@@ -37,6 +37,13 @@ def make_callback(f):
     return lambda result, *args, **kwargs: f(*args, **kwargs)
 
 
+def make_retries(f, reraise=False, stop=None):
+    def errback(ctx):
+        ctx.trap()
+        return f()
+    return errback
+
+
 def retry_deferred(*retry_args, **retry_kwargs):
     """
     Wrap a test method that may or may not return a Deferred
@@ -49,22 +56,10 @@ def retry_deferred(*retry_args, **retry_kwargs):
             retried = retry(*retry_args, **retry_kwargs)(f)
             # invoke the function using retries
             result = retried(*args, **kwargs)
-            # if the result is a Deferred, wrap the inner
-            # callback(s) in retries
+            # if the result is a Deferred, create deferred retries
             if isinstance(result, Deferred):
-                result.callbacks[:] = [
-                    (
-                        (
-                            retry(*retry_args, **retry_kwargs)(callback),
-                            callbackArgs,
-                            callbackKeywords,
-                        ),
-                        errback_spec,
-                    )
-                    for (
-                        callback, callbackArgs, callbackKeywords),
-                    errback_spec in result.callbacks
-                ]
+                for again in make_retries(f, *retry_args, **retry_kwargs)
+                    result = result.addErrback(again, *args, **kwargs)
             return result
         return wrapper
     return decorator
