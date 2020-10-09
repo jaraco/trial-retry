@@ -37,37 +37,19 @@ def make_callback(f):
     return lambda result, *args, **kwargs: f(*args, **kwargs)
 
 
-def retry_deferred(*retry_args, **retry_kwargs):
+def resolve_deferred(f):
     """
-    Wrap a test method that may or may not return a Deferred
-    result and ensure the underlying behavior honors the retry
-    parameters. Honors the same parameters as ``retry``.
+    Wrap a call that may or may not return a Deferred
+    result and if a Deferred is returned, synchronize with
+    it before returning.
     """
-    def decorator(f):
-        @functools.wraps(f)
-        def wrapper(*args, **kwargs):
-            retried = retry(*retry_args, **retry_kwargs)(f)
-            # invoke the function using retries
-            result = retried(*args, **kwargs)
-            # if the result is a Deferred, wrap the inner
-            # callback(s) in retries
-            if isinstance(result, Deferred):
-                result.callbacks[:] = [
-                    (
-                        (
-                            retry(*retry_args, **retry_kwargs)(callback),
-                            callbackArgs,
-                            callbackKeywords,
-                        ),
-                        errback_spec,
-                    )
-                    for (
-                        callback, callbackArgs, callbackKeywords),
-                    errback_spec in result.callbacks
-                ]
-            return result
-        return wrapper
-    return decorator
+    @functools.wraps(f)
+    def wrapper(*args, **kwargs):
+        res = f(*args, **kwargs)
+        if isinstance(res, Deferred):
+            res = reactor.wait(res)
+        return res
+    return wrapper
 
 
 def setup_deferred(f):
@@ -96,13 +78,15 @@ def make_flaky(f):
 
 
 class DeferredsTests(unittest.TestCase):
-    @retry_deferred(reraise=True, stop=stop_after_attempt(12))
+    @retry(reraise=True, stop=stop_after_attempt(12))
+    @resolve_deferred
     @make_flaky
     @setup_deferred
     def test_simple_exception(self):
         flaky_exception()
 
-    @retry_deferred(reraise=True, stop=stop_after_attempt(12))
+    @retry(reraise=True, stop=stop_after_attempt(12))
+    @resolve_deferred
     @make_flaky
     @setup_deferred
     def test_simple_failure(self):
